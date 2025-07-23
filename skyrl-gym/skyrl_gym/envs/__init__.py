@@ -26,3 +26,8 @@ register(
     id="searchcode",
     entry_point="skyrl_gym.envs.searchcode.env:SearchCodeEnv",
 )
+
+register(
+    id="allocated_code",
+    entry_point="skyrl_gym.envs.allocated_code.env:AllocatedCodeEnv",
+)
