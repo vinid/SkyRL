@@ -6,6 +6,15 @@ import random
 from typing import Dict, List, Any
 
 
+def convert_to_docker_path(local_path: str) -> str:
+    """Convert local file path to Docker mount path"""
+    # Replace the local data_folder path with /data
+    local_data_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data_folder")
+    if local_path.startswith(local_data_folder):
+        return local_path.replace(local_data_folder, "/data")
+    return local_path
+
+
 def make_discovery_prefix(dp: Dict[str, Any]) -> str:
     """Create the prompt prefix for DiscoveryBench tasks"""
     query = dp['query']
@@ -30,7 +39,7 @@ COLUMNS:
 
 QUERY: {query}
 
-DATASET LOCATION:
+DATASET LOCATION (use full path):
 {dp['dataset_path']}
 
 INSTRUCTIONS:
@@ -38,6 +47,96 @@ INSTRUCTIONS:
 2. Perform statistical analysis to find relationships between variables
 3. Analyze the data to answer the research query
 4. Provide insights and conclusions based on your analysis
+5. Do one step at a time. Explore the data and then answer the query.
+6. Do not use plotting libraries. You cannot see the plots.
+
+You MUST use the following format for your response. Each step must follow this exact structure:
+
+<reasoning>
+Write clear reasoning about what you plan to do next and why. Be specific about your analytical approach.
+</reasoning>
+<python>
+Write executable Python code here. Each code block should do ONE specific task.
+Code must be complete and runnable. Include all necessary imports.
+</python>
+<information>
+The output/results from your Python code will appear here.
+This section is read-only - you cannot write here.
+</information>
+
+Repeat these blocks for each analysis step. When you reach your conclusion:
+
+<answer>
+Write your final answer here. Include:
+1. Direct answer to the query
+2. Key findings that support your answer
+3. Any important caveats or limitations
+</answer>
+
+Here is a concrete example:
+
+Question: Which city has the most people in the dataset?
+
+<reasoning>
+First, I will load the dataset and examine its structure to understand what data we have available for analysis.
+</reasoning>
+<python>
+import pandas as pd
+df = pd.read_csv('/data/data.csv')
+print(df.columns)
+print("\nFirst few rows:")
+print(df.head())
+print("\nBasic statistics:")
+print(df.describe())
+</python>
+<information>
+Index(['id', 'name', 'age', 'gender', 'city', 'country'], dtype='object')
+
+First few rows:
+   id    name  age gender       city country
+0   1   Alice   25      F  New York     USA
+1   2     Bob   30      M  Chicago     USA
+2   3  Carol   35      F   Boston     USA
+
+Basic statistics:
+              id         age
+count  100.0000  100.000000
+mean    50.5000   32.456000
+std     29.0115    8.234567
+</information>
+<reasoning>
+Now that I understand the data structure, I will analyze the city distribution to identify population patterns.
+</reasoning>
+<python>
+city_counts = df.groupby('city').size().sort_values(ascending=False)
+print("City distribution:")
+print(city_counts)
+print("\nPercentage by city:")
+print((city_counts / len(df) * 100).round(2))
+</python>
+<information>
+City distribution:
+New York      100
+Los Angeles    50
+Chicago        30
+Houston        20
+Miami          10
+Name: count, dtype: int64
+
+Percentage by city:
+New York      47.62
+Los Angeles   23.81
+Chicago       14.29
+Houston        9.52
+Miami          4.76
+Name: count, dtype: float64
+</information>
+<reasoning>
+I can see that New York has the most people in the dataset.
+</reasoning>
+<answer>
+New York is the most represented city, accounting for nearly half (47.62%) of all records with 100 people.
+</answer>
 """
     return prefix
 
@@ -91,7 +190,7 @@ def load_synthetic_data(split: str) -> List[Dict[str, Any]]:
                     'columns_info': columns_info.strip(),
                     'domain_knowledge': '',
                     'workflow_tags': '',
-                    'dataset_path': csv_path,
+                    'dataset_path': convert_to_docker_path(csv_path),
                     'true_hypothesis': true_hypothesis,
                     'true_workflow': '',
                     'metadata_type': 'synth',
@@ -169,7 +268,7 @@ def load_real_data(split: str) -> List[Dict[str, Any]]:
                                 'columns_info': columns_info.strip(),
                                 'domain_knowledge': domain_knowledge,
                                 'workflow_tags': workflow_tags,
-                                'dataset_path': csv_path,
+                                'dataset_path': convert_to_docker_path(csv_path),
                                 'true_hypothesis': true_hypothesis,
                                 'true_workflow': workflow,
                                 'metadata_type': 'real',
@@ -228,11 +327,11 @@ def create_discovery_dataset():
         
         system_prompt = {
             "role": "system",
-            "content": "You are a discovery agent who can analyze datasets and generate scientific hypotheses."
+            "content": "You are a discovery agent who can analyze datasets and generate scientific hypotheses. /nothink"
         }
         
-        # Expected output is just the true hypothesis (as the ground truth answer)
-        expected_output = example['true_hypothesis']
+        # Convert true hypothesis to golden_answers format
+        golden_answers = [example['true_hypothesis']] if example['true_hypothesis'] else []
         
         data = {
             "data_source": "discovery_bench",
@@ -246,12 +345,11 @@ def create_discovery_dataset():
             "env_class": "allocated_code",
             "reward_spec": {
                 "method": "rule",
-                "ground_truth": expected_output
+                "ground_truth": str(example['true_hypothesis'])
             },
             "extra_info": {
-                "query": example['query'],
-                "true_hypothesis": example['true_hypothesis'],
-                "true_workflow": example['true_workflow'],
+                "question": example['query'],
+                "original_answers": golden_answers,
                 "dataset_path": example['dataset_path'],
                 "metadata_type": example['metadata_type'],
                 "source": example['source'],

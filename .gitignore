@@ -8,6 +8,7 @@ __pycache__/
 /data/lcb
 
 executors
+checkpoints/
 *.parquet
 
 # Documentation build artifacts

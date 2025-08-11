@@ -1,20 +1,25 @@
 #!/bin/bash
 set -x
 
+if [ -z "${TOGETHER_API_KEY}" ] || [ -z "${WANDB_API_KEY}" ]; then
+    echo "Error: TOGETHER_API_KEY and WANDB_API_KEY must be set"
+    exit 1
+fi
+
 # Allocated Code training with GRPO
 # Make sure your container manager is running at localhost:5000
 # export WANDB_API_KEY=<your_key_here>
 # Usage: bash examples/allocated_code/run_allocated_code.sh
 
-DATA_DIR="/data/fede/SkyRL/skyrl-gym/skyrl_gym/envs/allocated_code/data/allocated_code"
+DATA_DIR="/data/fede/SkyRL/skyrl-gym/skyrl_gym/envs/allocated_code/discovery_bench/data"
 
 # Container allocation math:
 # train_batch_size * n_samples_per_prompt = total concurrent containers needed  
 # Under 50: 12 * 4 = 48 containers
 
 uv run --isolated --frozen --extra vllm -m skyrl_train.entrypoints.main_base \
-  data.train_data="['$DATA_DIR/train.parquet']" \
-  data.val_data="['$DATA_DIR/validation.parquet']" \
+  data.train_data="['$DATA_DIR/discovery_train.parquet']" \
+  data.val_data="['$DATA_DIR/discovery_validation.parquet']" \
   trainer.algorithm.advantage_estimator="grpo" \
   trainer.policy.optimizer_config.lr=1.0e-6 \
   trainer.policy.optimizer_config.max_grad_norm=0.5 \
@@ -36,7 +41,7 @@ uv run --isolated --frozen --extra vllm -m skyrl_train.entrypoints.main_base \
   generator.gpu_memory_utilization=0.5 \
   trainer.epochs=5 \
   trainer.update_epochs_per_batch=1 \
-  trainer.train_batch_size=32 \
+  trainer.train_batch_size=20 \
   trainer.policy_mini_batch_size=4 \
   trainer.micro_forward_batch_size_per_gpu=1 \
   trainer.micro_train_batch_size_per_gpu=1 \

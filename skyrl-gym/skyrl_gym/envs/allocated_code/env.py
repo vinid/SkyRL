@@ -90,7 +90,7 @@ class AllocatedCodeEnv(BaseTextEnv):
     def _get_reward(self, action: str, done: bool) -> float:
         if done:
             chat_history_str = "".join([item["content"] for item in self.chat_history])
-            return utils.compute_score(chat_history_str, self.ground_truth)
+            return utils.compute_llm_score(chat_history_str, self.ground_truth)
         else:
             return 0
 
