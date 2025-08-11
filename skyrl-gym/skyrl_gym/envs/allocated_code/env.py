@@ -5,10 +5,6 @@ import re
 from typing import Dict, Optional, List
 from omegaconf import DictConfig
 import httpx
-import logging
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 
 class AllocatedCodeToolGroup:
@@ -19,32 +15,24 @@ class AllocatedCodeToolGroup:
     
     def allocate_container(self):
         if self.allocated_container is not None:
-            logger.info(f"Container already allocated: {self.allocated_container}")
             return
         
-        logger.info(f"Allocating container from {self.manager_url}/allocate")
         response = self.client.post(f"{self.manager_url}/allocate")
         response.raise_for_status()
         result = response.json()
         self.allocated_container = result["container_id"]
-        logger.info(f"Allocated container: {self.allocated_container}")
     
     def deallocate_container(self):
         if self.allocated_container is None:
-            logger.info("No container to deallocate")
             return
         
-        logger.info(f"Deallocating container: {self.allocated_container}")
         self.client.post(f"{self.manager_url}/deallocate/{self.allocated_container}")
         self.allocated_container = None
-        logger.info("Container deallocated")
     
     def execute_code(self, code: str) -> str:
         if self.allocated_container is None:
-            logger.error("No container allocated for code execution")
             raise RuntimeError("No container allocated")
         
-        logger.info(f"Executing code on container {self.allocated_container}: {code[:100]}...")
         response = self.client.post(
             f"{self.manager_url}/session/{self.allocated_container}/execute",
             json={"code": code}
@@ -52,7 +40,6 @@ class AllocatedCodeToolGroup:
         response.raise_for_status()
         result = response.json()
         output = str(result.get("outputs", []))
-        logger.info(f"Code execution result: {output}")
         return output
     
     def get_tool_names(self):
@@ -71,27 +58,20 @@ class AllocatedCodeEnv(BaseTextEnv):
         manager_url = env_config.get("manager_url", "http://localhost:5000")
         self.tool_group = AllocatedCodeToolGroup(manager_url)
         
-        # Allocate container immediately since training framework may not call init/reset
-        logger.info("=== ENVIRONMENT CONSTRUCTOR ===")
         self.tool_group.allocate_container()
-        logger.info("Container allocated in constructor")
         
         self.chat_history: ConversationType = []
 
     def reset(self, **kwargs):
-        logger.info("=== ENVIRONMENT RESET ===")
         self.turns = 0
         self.chat_history = []
         self.tool_group.allocate_container()
-        logger.info("Environment reset complete")
-        return []  # Return empty observations
+        return []
 
     def init(self, prompt: ConversationType) -> Tuple[ConversationType, Dict[str, Any]]:
-        logger.info("=== ENVIRONMENT INIT ===")
         self.turns = 0
         self.chat_history = []
         self.tool_group.allocate_container()
-        logger.info("Environment init complete")
         return prompt, {}
 
     def _parse_action(self, action: str) -> Optional[str]:
@@ -110,7 +90,7 @@ class AllocatedCodeEnv(BaseTextEnv):
     def _get_reward(self, action: str, done: bool) -> float:
         if done:
             chat_history_str = "".join([item["content"] for item in self.chat_history])
-            return utils.compute_score(chat_history_str, self.ground_truth)
+            return utils.compute_llm_score(chat_history_str, self.ground_truth)
         else:
             return 0
 
@@ -128,9 +108,6 @@ class AllocatedCodeEnv(BaseTextEnv):
             return action
 
     def step(self, action: str) -> BaseTextEnvStepOutput:
-        logger.info(f"=== ENVIRONMENT STEP {self.turns + 1} ===")
-        logger.info(f"Action: {action[:200]}...")
-        
         self.turns += 1
         action = self._postprocess_action(action)
         self.chat_history.append({"role": "assistant", "content": action})
@@ -138,11 +115,8 @@ class AllocatedCodeEnv(BaseTextEnv):
         error = None
         done = self._is_done(action)
         reward = self._get_reward(action, done)
-        
-        logger.info(f"Done: {done}, Reward: {reward}")
 
         if done:
-            logger.info("Episode finished, deallocating container")
             self.tool_group.deallocate_container()
             return BaseTextEnvStepOutput(
                 observations=[], reward=reward, done=done, metadata={}, postprocessed_action=action
@@ -150,17 +124,12 @@ class AllocatedCodeEnv(BaseTextEnv):
 
         try:
             code = self._parse_action(action)
-            logger.info(f"Parsed code: {code}")
             if code:
-                logger.info("Executing code...")
                 tool_output = self.tool_group.execute_code(code)
                 observation = "\n<information>" + tool_output + "</information>\n"
-                logger.info(f"Code executed successfully, observation: {observation[:100]}...")
             else:
-                logger.info("No code found in action")
                 observation = None
         except Exception as e:
-            logger.error(f"Code execution error: {str(e)}")
             error = str(e)
             observation = None
 
@@ -190,7 +159,5 @@ class AllocatedCodeEnv(BaseTextEnv):
         )
 
     def close(self):
-        logger.info("=== ENVIRONMENT CLOSE ===")
         self.tool_group.deallocate_container()
-        super().close()
-        logger.info("Environment closed") 
+        super().close() 
