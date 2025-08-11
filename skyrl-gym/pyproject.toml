@@ -19,6 +19,7 @@ dependencies = [
     "pandas", 
     "requests",
     "omegaconf",
+    "litellm[proxy]>=1.75.3",
 ]
 
 [project.urls]

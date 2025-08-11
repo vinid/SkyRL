@@ -11,20 +11,21 @@ def make_prefix(dp, template_type='base'):
             You are answering a question that could require multiple steps to solve, combining search, coding and reasoning.
             
             IMPORTANT: You MUST follow this EXACT format for EVERY response:
-            1. Start with <think> to show your reasoning process </think>
-            2. Use <python> for searches or calculations </python>
+            1. Start with <reasoning> to show your reasoning process </reasoning>
+            2. Use <python> for searches or calculations </python>. You can use the search functions to search the web.
             3. When code returns results, they will appear between <information> and </information> tags
-            4. Use as many <think> / <python> blocks as needed to solve the question
+            4. Use as many <reasoning> / <python> blocks as needed to solve the question
             5. ALWAYS end with <answer> your final answer </answer>
             6. Feel free to test code implementation before returning the final answer
             
             RULES:
-            - NEVER skip the <think> step or provide a final answer without <answer> tags
+            - NEVER skip the <reasoning> step or provide a final answer without <answer> tags
             - ALL code must be inside <python> tags
             - Code sessions are not isolated - you can use variables from one code block in another
-            - Break down complex questions into smaller steps in the <think> section
+            - Break down complex questions into smaller steps in the <reasoning> section
             - Answers are typically very short (1-3 words)
             - If you fail at something, try again but think first
+            - Look at how we interleave the <reasoning> and <python> tags to see how to format your response
             
             You can:
             1. Search for information:
@@ -43,9 +44,9 @@ def make_prefix(dp, template_type='base'):
 
             Example 1 (Search):
             Question: ``Where do heart's electrical impulses originate?```
-            <think>
+            <reasoning>
             Ok this answer can be found by searching for the origin of heart's electrical impulses.
-            </think>
+            </reasoning>
             <python>
             result = search('origin of heart's electrical impulses')
             print(result)
@@ -53,9 +54,9 @@ def make_prefix(dp, template_type='base'):
             <information>
             [Search results appear here]
             </information>
-            <think>
+            <reasoning>
             No other information is needed, the final answer is in the search results.
-            </think>
+            </reasoning>
             <answer>
             [Concise answer here]
             </answer>
@@ -71,14 +72,14 @@ def make_prefix(dp, template_type='base'):
 
             The len has to be computed on the entire answer, that's why we cast it to a string.```
 
-            <think> to solve this i first need to find the value of VAR_XTWI, which is the length of the answer to the question "who did the seahawks play in super bowl 2014?" </think>
+            <reasoning> to solve this i first need to find the value of VAR_XTWI, which is the length of the answer to the question "who did the seahawks play in super bowl 2014?" </reasoning>
             <python> search("who did the seahawks play in super bowl 2014?") </python>
             <information> 
 
             [1] the seahawks are playing against the denver broncos in super bowl 2014 
 
             </information>
-            <think> ok so since i know that the answer is composed of words, the current answer is "denver broncos", let me compute the length of the answer and subtract 10 to get the final value of VAR_XTWI. </think>
+            <reasoning> ok so since i know that the answer is composed of words, the current answer is "denver broncos", let me compute the length of the answer and subtract 10 to get the final value of VAR_XTWI. </reasoning>
             <python> 
             VAR_XTWI = len("denver broncos") - 10 
 
@@ -87,7 +88,7 @@ def make_prefix(dp, template_type='base'):
             <information>
             4
             </information>
-            <think> now there is additional information i need to find. in this case the square root of VAR_XTWI </think>
+            <reasoning> now there is additional information i need to find. in this case the square root of VAR_XTWI </reasoning>
             <python>
             k = sqrt(VAR_XTWI)
             print(k)
@@ -95,7 +96,7 @@ def make_prefix(dp, template_type='base'):
             <information>
             2
             </information>
-            <think> ok I have all the information I need, let me return the answer </think>
+            <reasoning> ok I have all the information I need, let me return the answer </reasoning>
             <answer>
             2
             </answer>
@@ -115,18 +116,35 @@ def create_real_dataset():
     
     flashrag_dataset = datasets.load_dataset('RUC-NLPIR/FlashRAG_datasets', 'nq')
     math_dataset = datasets.load_dataset('federicotogether/math-search-o1-v1', download_mode='force_redownload')
+    frames_dataset = datasets.load_dataset('federicotogether/frames-train')
 
     sampled_flashrag_train = flashrag_dataset['train'].shuffle(seed=42).select(range(200))
     sampled_flashrag_test = flashrag_dataset['test'].shuffle(seed=42).select(range(50))
     
+    # Sample 350 examples from frames dataset (300 for train, 50 for test)
+    sampled_frames_train = frames_dataset['test'].shuffle(seed=42).select(range(300))
+    sampled_frames_test = frames_dataset['test'].shuffle(seed=42).select(range(300, 350))
+    
+    normalized_frames_train = sampled_frames_train.map(lambda x: {
+        'question': x['Prompt'], 
+        'golden_answers': [x['Answer']]
+    })
+    
+    normalized_frames_test = sampled_frames_test.map(lambda x: {
+        'question': x['Prompt'], 
+        'golden_answers': [x['Answer']]
+    })
+    
     train_dataset = datasets.concatenate_datasets([
         sampled_flashrag_train,
-        math_dataset['train']
+        math_dataset['train'],
+        normalized_frames_train
     ]).shuffle(seed=42)
 
     test_dataset = datasets.concatenate_datasets([
         sampled_flashrag_test,
-        math_dataset['test']
+        math_dataset['test'],
+        normalized_frames_test
     ]).shuffle(seed=42)
 
     print(f"Train dataset size: {len(train_dataset)}")
@@ -142,7 +160,7 @@ def create_real_dataset():
         
         system_prompt = {
             "role": "system", 
-            "content": "You are a helpful assistant that can search for information and perform calculations to answer questions."
+            "content": "You are a helpful assistant that can search for information and perform calculations to answer questions. /nothink"
         }
         
         ground_truth = example['golden_answers']
