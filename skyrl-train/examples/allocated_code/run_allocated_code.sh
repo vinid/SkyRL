@@ -6,7 +6,7 @@ set -x
 # export WANDB_API_KEY=<your_key_here>
 # Usage: bash examples/allocated_code/run_allocated_code.sh
 
-DATA_DIR="/data/fede/SkyRL/skyrl-train/skyrl-gym/skyrl_gym/envs/allocated_code/data/allocated_code"
+DATA_DIR="/data/fede/SkyRL/skyrl-gym/skyrl_gym/envs/allocated_code/data/allocated_code"
 
 # Container allocation math:
 # train_batch_size * n_samples_per_prompt = total concurrent containers needed  
@@ -21,7 +21,7 @@ uv run --isolated --frozen --extra vllm -m skyrl_train.entrypoints.main_base \
   trainer.policy.optimizer_config.num_warmup_steps=12 \
   trainer.algorithm.use_kl_loss=true \
   trainer.algorithm.kl_loss_coef=0.001 \
-  trainer.policy.model.path="Qwen/Qwen2.5-3B-Instruct" \
+  trainer.policy.model.path="Qwen/Qwen3-4B" \
   trainer.placement.colocate_all=true \
   trainer.strategy=fsdp2 \
   trainer.policy.fsdp_config.cpu_offload=false \
@@ -34,20 +34,20 @@ uv run --isolated --frozen --extra vllm -m skyrl_train.entrypoints.main_base \
   generator.run_engines_locally=true \
   generator.weight_sync_backend=nccl \
   generator.gpu_memory_utilization=0.5 \
-  trainer.epochs=1 \
+  trainer.epochs=5 \
   trainer.update_epochs_per_batch=1 \
-  trainer.train_batch_size=12 \
+  trainer.train_batch_size=32 \
   trainer.policy_mini_batch_size=4 \
   trainer.micro_forward_batch_size_per_gpu=1 \
   trainer.micro_train_batch_size_per_gpu=1 \
   trainer.max_prompt_length=2048 \
-  generator.max_input_length=4096 \
-  generator.sampling_params.max_generate_length=1024 \
+  generator.max_input_length=5096 \
+  generator.sampling_params.max_generate_length=1524 \
   generator.async_engine=true \
   generator.batched=false \
   generator.use_conversation_multi_turn=false \
   generator.n_samples_per_prompt=4 \
-  generator.max_turns=4 \
+  generator.max_turns=10 \
   generator.sampling_params.temperature=0.6 \
   generator.sampling_params.top_p=0.95 \
   environment.env_class=allocated_code \
@@ -56,14 +56,14 @@ uv run --isolated --frozen --extra vllm -m skyrl_train.entrypoints.main_base \
   trainer.logger="wandb" \
   trainer.project_name="skyrl-allocated-code" \
   trainer.run_name="allocated_code_simple" \
-  trainer.ckpt_interval=10 \
-  trainer.hf_save_interval=50 \
+  trainer.ckpt_interval=25 \
+  trainer.hf_save_interval=25 \
   trainer.max_ckpts_to_keep=5 \
   trainer.resume_mode=latest \
-  trainer.ckpt_path="$HOME/skyrl-allocated-code_simple" \
+  trainer.ckpt_path="/data/fede/SkyRL/checkpoints/skyrl-allocated-code_simple" \
   trainer.eval_batch_size=12 \
   trainer.eval_before_train=false \
   generator.eval_sampling_params.temperature=0 \
-  trainer.export_path="$HOME/skyrl-allocated-code_simple/exports" \
+  trainer.export_path="/data/fede/SkyRL/checkpoints/skyrl-allocated-code_simple/exports" \
   trainer.eval_interval=10 \
   $@ 

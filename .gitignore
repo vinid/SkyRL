@@ -8,6 +8,7 @@ __pycache__/
 /data/lcb
 
 executors
+*.parquet
 
 # Documentation build artifacts
 /skyrl-train/docs/_build/
