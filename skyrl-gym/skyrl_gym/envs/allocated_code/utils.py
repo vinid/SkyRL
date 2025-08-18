@@ -21,11 +21,26 @@ def compute_score(solution_str, ground_truth, method="strict", format_score=0.0,
             return format_score
 
 
-def compute_llm_score(solution_str, ground_truth, method="strict", format_score=0.0, score=1.0):
+def compute_llm_score(solution_str, history_str, ground_truth, query, method="strict", format_score=0.0, score=1.0):
     solution_str =  str(solution_str)
     ground_truth = str(ground_truth)
+    history_str = str(history_str)
 
     prompt = f"""You are a judge evaluating scientific hypotheses. You need to score how well the predicted hypothesis matches the ground truth hypothesis.
+Both the hypotheses answer the natural language query "Query" over the dataset(s).
+To evaluate the hypothesis, you need to consider three dimensions that define the hypothesis: Context, Variables, and Relations. 
+Here are the definitions for these dimensions:
+- Contexts: Boundary conditions that limit the scope of a hypothesis. E.g., “for men over \
+the age of 30”, “in Asia and Europe”. 
+- Variables: Known concepts that interact in a meaningful way under a given context to \
+produce the hypothesis. E.g., gender, age, income, or "None" if there is no interacting variable.
+- Relations: Interactions between a given set of variables under a given context to produce \
+the hypothesis. E.g., “quadratic relationship”, “inversely proportional”, piecewise conditionals, \
+or "None" if there is no interacting relationship.
+Compare the predicted hypothesis with the ground truth hypothesis in terms of these three dimensions.
+
+Query:
+{query}
 
 Predicted Hypothesis:
 {solution_str}
@@ -33,9 +48,12 @@ Predicted Hypothesis:
 Ground Truth Hypothesis:
 {ground_truth}
 
+Entire Trajectory:
+{history_str}
+
 Evaluate the hypothesis and provide a score between 0 and 1, where:
 - 1.0 means the hypotheses make the same scientific claim
-- 0.0 means completely different or contradictory claims
+- 0.0 means completely different or contradictory claims, or the predicted hypothesis is None
 - Values between 0 and 1 indicate partial alignment in variables, relationships, or context
 
 Return your response in the following format:

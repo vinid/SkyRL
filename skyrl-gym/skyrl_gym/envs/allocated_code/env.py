@@ -54,7 +54,8 @@ class AllocatedCodeEnv(BaseTextEnv):
         assert "ground_truth" in extras["reward_spec"], "ground_truth is required in reward_spec field"
         self.ground_truth = extras["reward_spec"]["ground_truth"]
         self.max_turns = extras["max_turns"] if "max_turns" in extras else 2
-
+        self.query = extras["extra_info"]["question"]
+        
         manager_url = env_config.get("manager_url", "http://localhost:5000")
         self.tool_group = AllocatedCodeToolGroup(manager_url)
         
@@ -87,10 +88,22 @@ class AllocatedCodeEnv(BaseTextEnv):
                 return code
         return None
 
+    def _extract_hypothesis(self, response: str) -> str:
+        """Extract hypothesis from model response."""
+        # Look for <answer> tags first
+        if '<answer>' in response and '</answer>' in response:
+            match = re.search(r'<answer>(.*?)</answer>', response, re.DOTALL)
+            if match:
+                return match.group(1).strip()
+        
+        # If no answer tags, return the full response
+        return ''
+    
     def _get_reward(self, action: str, done: bool) -> float:
         if done:
             chat_history_str = "".join([item["content"] for item in self.chat_history])
-            return utils.compute_llm_score(chat_history_str, self.ground_truth)
+            hypothesis = self._extract_hypothesis(chat_history_str)
+            return utils.compute_llm_score(hypothesis, chat_history_str, self.ground_truth, self.query)
         else:
             return 0
 
