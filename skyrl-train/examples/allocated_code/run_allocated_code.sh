@@ -10,8 +10,8 @@ if [ -z "${TOGETHER_API_KEY}" ] || [ -z "${WANDB_API_KEY}" ]; then
 fi
 # Allocated Code training with GRPO
 # Make sure your container manager is running at localhost:5000
-# export WANDB_API_KEY=
-# export TOGETHER_API_KEY=
+# export WANDB_API_KEY=your_wandb_api_key_here
+# export TOGETHER_API_KEY=your_together_api_key_here
 # Usage: bash examples/allocated_code/run_allocated_code.sh
 
 DATA_DIR="/data/fede/SkyRL/skyrl-gym/skyrl_gym/envs/allocated_code/data/allocated_code"
@@ -83,10 +83,10 @@ uv run --isolated --frozen --extra vllm -m skyrl_train.entrypoints.main_base \
   trainer.hf_save_interval=25 \
   trainer.max_ckpts_to_keep=5 \
   trainer.resume_mode=latest \
-  trainer.ckpt_path="/data/fede/SkyRL/checkpoints/skyrl-discovery-4b" \
+  trainer.ckpt_path="/data/fan/SkyRL/checkpoints/skyrl-discovery-4b" \
   trainer.eval_batch_size=16 \
   trainer.eval_before_train=true \
   generator.eval_sampling_params.temperature=0 \
-  trainer.export_path="/data/fede/SkyRL/checkpoints/skyrl-discovery-4b/exports" \
+  trainer.export_path="/data/fan/SkyRL/checkpoints/skyrl-discovery-4b/exports" \
   trainer.eval_interval=10 \
   $@ 
