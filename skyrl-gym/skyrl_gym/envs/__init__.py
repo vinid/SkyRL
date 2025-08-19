@@ -31,3 +31,13 @@ register(
     id="searchcode",
     entry_point="skyrl_gym.envs.searchcode.env:SearchCodeEnv",
 )
+
+register(
+    id="allocated_code",
+    entry_point="skyrl_gym.envs.allocated_code.env:AllocatedCodeEnv",
+)
+
+register(
+    id="allocated_code_test",
+    entry_point="skyrl_gym.envs.allocated_code.test_env:AllocatedCodeTestEnv",
+)

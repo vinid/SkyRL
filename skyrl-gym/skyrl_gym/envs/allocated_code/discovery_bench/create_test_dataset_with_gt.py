@@ -10,7 +10,7 @@ import random
 import pandas as pd
 from typing import List, Dict, Any, Tuple
 
-from create_discovery_dataset import make_discovery_prefix
+from create_discovery_dataset import make_discovery_prefix, convert_to_docker_path
 
 
 def load_ground_truth_mapping(csv_path: str) -> Dict[Tuple[str, int, int], str]:
@@ -113,7 +113,7 @@ def load_real_test_data_with_gt(ground_truth_csv: str) -> List[Dict[str, Any]]:
                                         'columns_info': columns_info.strip(),
                                         'domain_knowledge': domain_knowledge,
                                         'workflow_tags': workflow_tags,
-                                        'dataset_path': csv_path,
+                                        'dataset_path': convert_to_docker_path(csv_path),
                                         'true_hypothesis': ground_truth,
                                         'metadata_type': 'real',
                                         'source': dataset_name,
@@ -175,7 +175,7 @@ def create_test_dataset_with_gt(ground_truth_csv: str):
             "env_class": "allocated_code_test",
             "reward_spec": {
                 "method": "rule",
-                "ground_truth": example['true_hypothesis']
+                "ground_truth": str(example['true_hypothesis'])
             },
             "extra_info": {
                 "question": example['query'],
@@ -253,6 +253,7 @@ def save_test_dataset_with_gt(ground_truth_csv: str, output_dir=None):
         print(f"Query: {random_example['extra_info']['question']}")
         print(f"Ground Truth: {random_example['reward_spec']['ground_truth']}")
         print(f"Dataset: {random_example['extra_info']['source']}")
+        print(f"Dataset Path: {random_example['extra_info']['dataset_path']}")
         print(f"Metadata ID: {random_example['extra_info']['metadata_id']}")
         print(f"Query ID: {random_example['extra_info']['query_id']}")
         print("="*80)
