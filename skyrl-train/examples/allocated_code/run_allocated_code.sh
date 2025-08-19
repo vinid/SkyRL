@@ -14,7 +14,7 @@ fi
 # export TOGETHER_API_KEY=your_together_api_key_here
 # Usage: bash examples/allocated_code/run_allocated_code.sh
 
-DATA_DIR="/data/fede/SkyRL/skyrl-gym/skyrl_gym/envs/allocated_code/data/allocated_code"
+DATA_DIR="/data/fan/SkyRL/skyrl-gym/skyrl_gym/envs/allocated_code/discovery_bench/data"
 
 # Container allocation math:
 # train_batch_size * n_samples_per_prompt = total concurrent containers needed  
