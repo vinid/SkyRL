@@ -4,16 +4,16 @@ set -x
 # # Limit to only use first 4 GPUs
 # export CUDA_VISIBLE_DEVICES=0,1,2,3
 
+if [ -z "${TOGETHER_API_KEY}" ] || [ -z "${WANDB_API_KEY}" ]; then
+    echo "Error: TOGETHER_API_KEY and WANDB_API_KEY must be set"
+    exit 1
+fi
+
 # Allocated Code training with GRPO
 # Make sure your container manager is running at localhost:5000
 # export WANDB_API_KEY=your_wandb_api_key_here
 # export TOGETHER_API_KEY=your_together_api_key_here
 # Usage: bash examples/allocated_code/run_allocated_code.sh
-
-if [ -z "${TOGETHER_API_KEY}" ] || [ -z "${WANDB_API_KEY}" ]; then
-    echo "Error: TOGETHER_API_KEY and WANDB_API_KEY must be set"
-    exit 1
-fi
 
 DATA_DIR="/data/fan/SkyRL/skyrl-gym/skyrl_gym/envs/allocated_code/discovery_bench/data"
 
