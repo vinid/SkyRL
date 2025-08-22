@@ -24,9 +24,10 @@ def make_discovery_prefix(dp: Dict[str, Any]) -> str:
     workflow_tags = dp['workflow_tags']
     
     prefix = f"""
-You are a discovery agent who can execute Python code to analyze datasets and generate scientific hypotheses.
+You are an expert data scientist and data analyst who tackles analytical challenges through systematic thinking and thorough investigation. 
+For each task, you will receive a question along with file paths to relevant data and background information. Your analysis should make full use of these data sources.
 
-TASK: Analyze the provided dataset to answer a research query and generate a scientific hypothesis.
+TASK: Analyze the provided dataset to generate a scientific hypothesis that answers the query.
 
 DATASET INFORMATION:
 {dataset_description}
@@ -39,16 +40,20 @@ COLUMNS:
 
 QUERY: {query}
 
-DATASET LOCATION (use full path):
+DATASET LOCATIONS (use full paths):
 {dp['dataset_path']}
 
 INSTRUCTIONS:
-1. Load and explore the dataset using Python (use the dataset location above)
-2. Perform statistical analysis to find relationships between variables
-3. Analyze the data to answer the research query
-4. Provide insights and conclusions based on your analysis
-5. Do one step at a time. Explore the data and then answer the query.
-6. Do not use plotting libraries. You cannot see the plots.
+1. Load and explore the dataset(s) using Python (use the dataset locations above)
+2. If multiple datasets are provided, analyze each one to find out what is relevant and consider how they relate to each other
+3. Perform data preprocessing, statistical analysis and, when appropriate, apply additional methods such as regression modeling, hypothesis testing, time-series, or spatial analysis, or feature engineering to identify relationships between variables.
+4. Where simple statistics are insufficient or the data does not contain enough information itself, attempt more advanced or alternative approaches (e.g., using regression, dimensionality reduction, robustness checks, or combining datasets).
+5. Provide insights and conclusions based on your analysis and come up with a scientific hypothesis that answers the query in your final answer section.
+6. Do one step at a time. Explore the data and then answer the query.
+7. Do not use plotting libraries. You cannot see the plots.
+8. When workflow tags are provided, you should use them to guide your analysis.
+9. Only form your final answer when you have enough evidence.
+
 
 You MUST use the following format for your response. Each step must follow this exact structure:
 
@@ -67,10 +72,10 @@ This section is read-only - you cannot write here.
 Repeat these blocks for each analysis step. When you reach your conclusion:
 
 <answer>
-Write your final answer here. Include:
-1. Direct answer to the query
-2. Key findings that support your answer
-3. Any important caveats or limitations
+Write your final scientific hypothesis here. Requirements:
+1. Direct and concise answer to the query
+2. Derived from the provided dataset
+3. Clearly stating the context of hypothesis (if any), variables chosen (if any) and relationship between those variables (if any) including any statistical significance.
 </answer>
 
 Here is a concrete example:
@@ -160,22 +165,36 @@ def load_synthetic_data(split: str) -> List[Dict[str, Any]]:
             
             # Get dataset directory
             dataset_dir = os.path.dirname(metadata_path)
-            csv_path = os.path.join(dataset_dir, 'data.csv')
             
-            if not os.path.exists(csv_path):
-                continue
-                
             # Extract information
             domain = metadata['domain']
             datasets_info = metadata['datasets']
             
-            dataset_desc = datasets_info[0]['description']
-            columns = datasets_info[0]['columns']
-            
-            # Format columns info
+            # Combine information from all datasets
+            dataset_descriptions = []
             columns_info = ""
-            for col in columns:
-                columns_info += f"- {col['name']}: {col['description']}\n"
+            dataset_paths = []
+            
+            for i, dataset_info in enumerate(datasets_info):
+                dataset_descriptions.append(f"Dataset {i+1}: {dataset_info['description']}")
+                columns = dataset_info['columns']
+                columns_info += f"\n=== Dataset {i+1}: {dataset_info.get('name', f'dataset_{i+1}')} ===\n"
+                for col in columns:
+                    columns_info += f"- {col['name']}: {col['description']}\n"
+                
+                # For synthetic data, typically use 'data.csv' but check if name is specified
+                csv_name = dataset_info.get('name', 'data.csv')
+                csv_path = os.path.join(dataset_dir, csv_name)
+                
+                if os.path.exists(csv_path):
+                    dataset_paths.append(convert_to_docker_path(csv_path))
+            
+            if not dataset_paths:
+                continue
+                
+            dataset_desc = "\n".join(dataset_descriptions)
+            # Use all available dataset paths, separated by newlines
+            combined_dataset_path = "\n".join(dataset_paths)
             
             # Get queries
             queries = metadata['queries']
@@ -190,7 +209,7 @@ def load_synthetic_data(split: str) -> List[Dict[str, Any]]:
                     'columns_info': columns_info.strip(),
                     'domain_knowledge': '',
                     'workflow_tags': '',
-                    'dataset_path': convert_to_docker_path(csv_path),
+                    'dataset_path': combined_dataset_path,
                     'true_hypothesis': true_hypothesis,
                     'true_workflow': '',
                     'metadata_type': 'synth',
@@ -236,18 +255,33 @@ def load_real_data(split: str) -> List[Dict[str, Any]]:
             except KeyError:
                 workflow = ''
             
-            dataset_desc = datasets_info[0]['description']
-            csv_name = datasets_info[0]['name']
-            csv_path = os.path.join(dataset_dir, csv_name)
-            
-            if not os.path.exists(csv_path):
-                continue
-            
-            # Format columns info
+            # Combine information from all datasets
+            dataset_descriptions = []
             columns_info = ""
-            raw_columns = datasets_info[0]['columns']['raw']
-            for col in raw_columns:
-                columns_info += f"- {col['name']}: {col['description']}\n"
+            dataset_paths = []
+            
+            for i, dataset_info in enumerate(datasets_info):
+                dataset_descriptions.append(f"Dataset {i+1}: {dataset_info['description']}")
+                csv_name = dataset_info['name']
+                csv_path = os.path.join(dataset_dir, csv_name)
+                
+                if os.path.exists(csv_path):
+                    dataset_paths.append(convert_to_docker_path(csv_path))
+                    
+                    # Format columns info for this dataset
+                    columns_info += f"\n=== Dataset {i+1}: {csv_name} ===\n"
+                    raw_columns = dataset_info['columns']['raw']
+                    for col in raw_columns:
+                        columns_info += f"- {col['name']}: {col['description']}\n"
+                else:
+                    print(f"Warning: CSV file not found: {csv_path}")
+            
+            if not dataset_paths:
+                continue
+                
+            dataset_desc = "\n".join(dataset_descriptions)
+            # Use all available dataset paths, separated by newlines
+            combined_dataset_path = "\n".join(dataset_paths)
             
             # Get queries
             queries = metadata['queries']
@@ -268,7 +302,7 @@ def load_real_data(split: str) -> List[Dict[str, Any]]:
                                 'columns_info': columns_info.strip(),
                                 'domain_knowledge': domain_knowledge,
                                 'workflow_tags': workflow_tags,
-                                'dataset_path': convert_to_docker_path(csv_path),
+                                'dataset_path': combined_dataset_path,
                                 'true_hypothesis': true_hypothesis,
                                 'true_workflow': workflow,
                                 'metadata_type': 'real',
@@ -327,7 +361,7 @@ def create_discovery_dataset():
         
         system_prompt = {
             "role": "system",
-            "content": "You are a discovery agent who can analyze datasets and generate scientific hypotheses. /nothink"
+            "content": "You are a discovery agent who can analyze datasets and generate scientific hypotheses."
         }
         
         # Convert true hypothesis to golden_answers format

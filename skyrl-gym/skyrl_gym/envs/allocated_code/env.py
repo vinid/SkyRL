@@ -56,6 +56,13 @@ class AllocatedCodeEnv(BaseTextEnv):
         self.max_turns = extras["max_turns"] if "max_turns" in extras else 2
         self.query = extras["extra_info"]["question"]
         
+        # Configure whether to enable code execution reward, default False (keep original behavior)
+        self.use_code_execution_reward = env_config.get("use_code_execution_reward", False)
+        self.code_execution_reward_value = env_config.get("code_execution_reward_value", 0.1)
+        
+        # Configure whether to use discrete reward scoring, default False (keep original behavior)
+        self.use_discrete_reward = env_config.get("use_discrete_reward", False)
+        
         manager_url = env_config.get("manager_url", "http://localhost:5000")
         self.tool_group = AllocatedCodeToolGroup(manager_url)
         
@@ -99,12 +106,21 @@ class AllocatedCodeEnv(BaseTextEnv):
         # If no answer tags, return the full response
         return ''
     
-    def _get_reward(self, action: str, done: bool) -> float:
+    def _get_reward(self, action: str, done: bool, tool_output: str = None) -> float:
         if done:
+            # Final reward: LLM-based scoring of hypothesis quality
             chat_history_str = "".join([item["content"] for item in self.chat_history])
             hypothesis = self._extract_hypothesis(chat_history_str)
-            return utils.compute_llm_score(hypothesis, chat_history_str, self.ground_truth, self.query)
+            if self.use_discrete_reward:
+                return utils.compute_llm_score_discrete(hypothesis, chat_history_str, self.ground_truth, self.query)
+            else:
+                return utils.compute_llm_score(hypothesis, chat_history_str, self.ground_truth, self.query)
         else:
+            # Intermediate reward: conditionally give reward for successful code execution
+            if (self.use_code_execution_reward and 
+                tool_output and 
+                utils.is_code_execution_successful(tool_output)):
+                return self.code_execution_reward_value
             return 0
 
     def _is_done(self, action: str) -> bool:
@@ -126,10 +142,11 @@ class AllocatedCodeEnv(BaseTextEnv):
         self.chat_history.append({"role": "assistant", "content": action})
 
         error = None
+        tool_output = None
         done = self._is_done(action)
-        reward = self._get_reward(action, done)
 
         if done:
+            reward = self._get_reward(action, done)
             self.tool_group.deallocate_container()
             return BaseTextEnvStepOutput(
                 observations=[], reward=reward, done=done, metadata={}, postprocessed_action=action
@@ -145,6 +162,9 @@ class AllocatedCodeEnv(BaseTextEnv):
         except Exception as e:
             error = str(e)
             observation = None
+        
+        # Calculate reward (including intermediate rewards)
+        reward = self._get_reward(action, done, tool_output)
 
         if observation:
             new_obs = {"role": "user", "content": observation}
