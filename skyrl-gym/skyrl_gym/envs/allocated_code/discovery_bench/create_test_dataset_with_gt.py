@@ -72,19 +72,34 @@ def load_real_test_data_with_gt(ground_truth_csv: str) -> List[Dict[str, Any]]:
                     print(f"Warning: No datasets info in {metadata_path}")
                     continue
                 
-                dataset_desc = datasets_info[0].get('description', '')
-                csv_name = datasets_info[0].get('name', '')
-                csv_path = os.path.join(dataset_path, csv_name)
-                
-                if not os.path.exists(csv_path):
-                    print(f"Warning: CSV file not found: {csv_path}")
-                    continue
-                
-                # Format columns info
+                # Combine information from all datasets
+                dataset_descriptions = []
                 columns_info = ""
-                raw_columns = datasets_info[0].get('columns', {}).get('raw', [])
-                for col in raw_columns:
-                    columns_info += f"- {col.get('name', '')}: {col.get('description', '')}\n"
+                dataset_paths = []
+                
+                for i, dataset_info in enumerate(datasets_info):
+                    dataset_descriptions.append(f"Dataset {i+1}: {dataset_info.get('description', '')}")
+                    csv_name = dataset_info.get('name', '')
+                    csv_path = os.path.join(dataset_path, csv_name)
+                    
+                    if os.path.exists(csv_path):
+                        dataset_paths.append(convert_to_docker_path(csv_path))
+                        
+                        # Format columns info for this dataset
+                        columns_info += f"\n=== Dataset {i+1}: {csv_name} ===\n"
+                        raw_columns = dataset_info.get('columns', {}).get('raw', [])
+                        for col in raw_columns:
+                            columns_info += f"- {col.get('name', '')}: {col.get('description', '')}\n"
+                    else:
+                        print(f"Warning: CSV file not found: {csv_path}")
+                
+                if not dataset_paths:
+                    print(f"Warning: No valid datasets found in {metadata_path}")
+                    continue
+                    
+                dataset_desc = "\n".join(dataset_descriptions)
+                # Use all available dataset paths, separated by newlines
+                combined_dataset_path = "\n".join(dataset_paths)
                 
                 # Get queries
                 queries = metadata.get('queries', [])
@@ -113,7 +128,7 @@ def load_real_test_data_with_gt(ground_truth_csv: str) -> List[Dict[str, Any]]:
                                         'columns_info': columns_info.strip(),
                                         'domain_knowledge': domain_knowledge,
                                         'workflow_tags': workflow_tags,
-                                        'dataset_path': convert_to_docker_path(csv_path),
+                                        'dataset_path': combined_dataset_path,
                                         'true_hypothesis': ground_truth,
                                         'metadata_type': 'real',
                                         'source': dataset_name,
@@ -157,7 +172,7 @@ def create_test_dataset_with_gt(ground_truth_csv: str):
         
         system_prompt = {
             "role": "system",
-            "content": "You are a discovery agent who can analyze datasets and generate scientific hypotheses. /nothink"
+            "content": "You are a discovery agent who can analyze datasets and generate scientific hypotheses."
         }
         
         # Use ground truth if available
