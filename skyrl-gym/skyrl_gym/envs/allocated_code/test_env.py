@@ -255,8 +255,8 @@ class AllocatedCodeToolGroup:
         )
         response.raise_for_status()
         result = response.json()
-        
-        return result.get("output", "")
+        output = str(result.get("outputs", []))
+        return output
     
     def get_tool_names(self):
         return ["python"]
