@@ -183,7 +183,7 @@ def load_synthetic_data(split: str) -> List[Dict[str, Any]]:
                     columns_info += f"- {col['name']}: {col['description']}\n"
                 
                 # For synthetic data, typically use 'data.csv' but check if name is specified
-                csv_name = dataset_info.get('name', 'data.csv')
+                csv_name = dataset_info[]
                 csv_path = os.path.join(dataset_dir, csv_name)
                 
                 if os.path.exists(csv_path):
